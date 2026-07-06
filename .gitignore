@@ -105,3 +105,9 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# --- Project-specific (VR Telemetry) ---
+# Session/participant data must never enter git history
+[Ss]essions/
+__pycache__/
+*.pyc
