@@ -1,126 +1,95 @@
 using System;
-using System.Globalization;
 using System.IO;
 using UnityEngine;
 
-/// <summary>
-/// Owns the lifecycle of a recording session: assigns IDs, writes a JSON manifest,
-/// tells the TelemetryLogger when to start/stop, and exports files to disk.
-///
-/// Files go to Application.persistentDataPath. On Quest 2 (Android) that is:
-///   /sdcard/Android/data/&lt;your.package.name&gt;/files/sessions/&lt;session_id&gt;/
-/// See README_SETUP.md for how to pull them off the headset.
-///
-/// FIRST TEST: leave autoStartOnPlay on and set autoStopAfterSeconds (e.g. 60).
-/// Press Play, put on the headset, walk a 2x2 m square, and the files write
-/// themselves when the timer ends. Fully hands-free, guaranteed to produce data.
-/// Later you can wire StopSession() to a controller button via the Input System.
-/// </summary>
+/// <summary>Session lifecycle and export. UTC labels; monotonic elapsed time.</summary>
 public class SessionManager : MonoBehaviour
 {
-    [Header("Session metadata")]
-    [Tooltip("Anonymous participant ID. Do NOT use real names. e.g. P001")]
     public string participantId = "P000";
-    [Tooltip("Which environment this session ran in. e.g. empty_room_test")]
     public string environmentId = "empty_room_test";
-    [Tooltip("Condition label for later analysis. e.g. neutral / eerie")]
     public string condition = "test";
-    [Tooltip("Trial number if the same participant runs multiple sessions.")]
     public int trialNumber = 1;
-
-    [Header("References")]
     public TelemetryLogger telemetry;
-
-    [Header("Control")]
     public bool autoStartOnPlay = true;
-    [Tooltip("Auto-stop and save after this many seconds. 0 = never (call StopSession yourself).")]
     public float autoStopAfterSeconds = 60f;
 
-    private const string SchemaVersion = "0.1.0";
-
-    private string sessionId;
-    private DateTime startUtc;
     private bool active;
+    private bool pendingExport;
     private string sessionFolder;
+    private Manifest manifest;
 
-    private void Start()
+    [Serializable]
+    private class Manifest
     {
-        if (autoStartOnPlay) StartSession();
+        public string schema_version = "0.2.0";
+        public string session_id, participant_id, environment_id, condition;
+        public int trial_number;
+        public string start_utc, end_utc;
+        public double duration_sec;
+        public float sample_rate_hz;
+        public int sample_count;
+        public long missed_sample_deadlines;
+        public string coordinate_system = "Unity left-handed, Y-up, meters. Floor plane = X by Z.";
+        public string rotation_format = "quaternion (x,y,z,w)";
+        public string telemetry_file = "telemetry.csv";
+        public string sampling_policy = "one_observation_per_LateUpdate_no_backfill";
+        public string timestamp_source = "Time.realtimeSinceStartupAsDouble; application observation, not sensor capture";
+        public string frame_semantics = "Unity Time.frameCount";
+        public bool origin_reference_assigned;
+        public string tracking_validity = "not_recorded; finite poses do not prove tracking validity";
+        public string unity_version;
     }
+
+    private void Start() { if (autoStartOnPlay) StartSession(); }
 
     public void StartSession()
     {
         if (active) return;
-        sessionId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + "_" + participantId;
-        startUtc = DateTime.UtcNow;
-
-        sessionFolder = Path.Combine(Application.persistentDataPath, "sessions", sessionId);
+        if (pendingExport) throw new InvalidOperationException("Retry StopSession to export the previous session first.");
+        if (telemetry == null) throw new InvalidOperationException("Assign a TelemetryLogger before recording.");
+        if (telemetry.IsLogging) throw new InvalidOperationException("Logger is already recording.");
+        manifest = new Manifest {
+            session_id = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + "_" + Guid.NewGuid().ToString("N"),
+            participant_id = participantId, environment_id = environmentId,
+            condition = condition, trial_number = trialNumber,
+            unity_version = Application.unityVersion,
+            origin_reference_assigned = telemetry.xrOrigin != null
+        };
+        sessionFolder = Path.Combine(Application.persistentDataPath, "sessions", manifest.session_id);
         Directory.CreateDirectory(sessionFolder);
-
-        if (telemetry != null) telemetry.StartLogging();
+        telemetry.StartLogging();
+        manifest.start_utc = DateTime.UtcNow.ToString("o");
+        manifest.sample_rate_hz = telemetry.TargetRateHz;
         active = true;
-        Debug.Log($"[SessionManager] Session started: {sessionId}\nWriting to: {sessionFolder}");
+        Debug.Log($"[SessionManager] Recording to {sessionFolder}");
     }
 
     public void StopSession()
     {
-        if (!active) return;
-        active = false;
-        if (telemetry != null) telemetry.StopLogging();
-
-        DateTime endUtc = DateTime.UtcNow;
-
-        File.WriteAllText(
-            Path.Combine(sessionFolder, "telemetry.csv"),
-            telemetry != null ? telemetry.GetCsv() : "");
-
-        File.WriteAllText(
-            Path.Combine(sessionFolder, "manifest.json"),
-            BuildManifestJson(endUtc));
-
-        int n = telemetry != null ? telemetry.SampleCount : 0;
-        Debug.Log($"[SessionManager] Session stopped. {n} samples written to {sessionFolder}");
-    }
-
-    private string BuildManifestJson(DateTime endUtc)
-    {
-        var ci = CultureInfo.InvariantCulture;
-        double durationSec = (endUtc - startUtc).TotalSeconds;
-        float rate = telemetry != null ? telemetry.sampleRateHz : 0f;
-        int count = telemetry != null ? telemetry.SampleCount : 0;
-
-        return
-"{\n" +
-$"  \"schema_version\": \"{SchemaVersion}\",\n" +
-$"  \"session_id\": \"{sessionId}\",\n" +
-$"  \"participant_id\": \"{participantId}\",\n" +
-$"  \"environment_id\": \"{environmentId}\",\n" +
-$"  \"condition\": \"{condition}\",\n" +
-$"  \"trial_number\": {trialNumber},\n" +
-$"  \"start_utc\": \"{startUtc.ToString("o", ci)}\",\n" +
-$"  \"end_utc\": \"{endUtc.ToString("o", ci)}\",\n" +
-$"  \"duration_sec\": {durationSec.ToString("F3", ci)},\n" +
-$"  \"sample_rate_hz\": {rate.ToString("F1", ci)},\n" +
-$"  \"sample_count\": {count},\n" +
-"  \"coordinate_system\": \"Unity left-handed, Y-up, meters. Floor plane = X (right) by Z (forward).\",\n" +
-"  \"rotation_format\": \"quaternion (x,y,z,w)\",\n" +
-"  \"telemetry_file\": \"telemetry.csv\"\n" +
-"}\n";
+        if (!active && !pendingExport) return;
+        if (active)
+        {
+            telemetry.StopLogging();
+            manifest.end_utc = DateTime.UtcNow.ToString("o");
+            manifest.duration_sec = telemetry.ElapsedSeconds;
+            manifest.sample_count = telemetry.SampleCount;
+            manifest.missed_sample_deadlines = telemetry.MissedSampleCount;
+            active = false;
+            pendingExport = true;
+        }
+        // Manifest last: its presence indicates these writes completed.
+        // On failure the buffer survives and StopSession can retry.
+        File.WriteAllText(Path.Combine(sessionFolder, "telemetry.csv"), telemetry.GetCsv());
+        File.WriteAllText(Path.Combine(sessionFolder, "manifest.json"), JsonUtility.ToJson(manifest, true));
+        pendingExport = false;
+        Debug.Log($"[SessionManager] Session stopped. {manifest.sample_count} samples written to {sessionFolder}");
     }
 
     private void Update()
     {
-        if (!active) return;
-        if (autoStopAfterSeconds > 0f &&
-            (DateTime.UtcNow - startUtc).TotalSeconds >= autoStopAfterSeconds)
-        {
+        if (active && autoStopAfterSeconds > 0 && telemetry.ElapsedSeconds >= autoStopAfterSeconds)
             StopSession();
-        }
     }
-
-    private void OnApplicationQuit()
-    {
-        // Safety net: if the app closes mid-session, still try to save.
-        if (active) StopSession();
-    }
+    private void OnApplicationQuit() { StopSession(); }
+    private void OnDisable() { StopSession(); }
 }
