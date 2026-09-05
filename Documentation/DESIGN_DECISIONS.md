@@ -389,9 +389,32 @@ Reagan offered to boot Unity and the headset for testing. The next checkpoint is
 the short procedure in VALIDATION_PROTOCOL.md. Attach reports and observations
 to a new dated entry here, including surprises or failures.
 
+## D015 — Standalone headset testing handoff
+
+Recorded: 2026-09-04 (America/New_York).
+Source: Reagan requested a detailed checklist to test independently the following day.
+Status: documentation prepared; no new headset evidence yet.
+
+Decision: provide TOMORROW_TEST_CHECKLIST.md with preparation, scene preservation,
+exact Inspector values, stationary recording first, conditional physical-square and
+optional thumbstick runs, validation commands, troubleshooting, and an evidence template.
+
+Why: testing should not depend on a live chat or on remembering earlier discussion.
+The checklist separates known schema limitations from new failures and gives clear
+reasons to stop rather than changing unrelated settings to make a test pass.
+
+Implementation: documentation only. Uses the existing validator and geometry command.
+No new numerical human-movement acceptance threshold is introduced. Failed runs remain
+useful evidence and raw recordings are preserved. No Git reset or blanket staging is
+part of the procedure.
+
+Review: commands and field names checked against the implemented scripts and protocol.
+The actual checklist has not yet been executed with the headset. Append the results
+as a new entry, rather than changing this handoff into a retrospective claim of success.
+
 ## Template for the next entry
 
-### D015 — [Decision title]
+### D016 — [Decision title]
 Recorded local date/time and timezone:
 Source/participants:
 Status:
@@ -405,4 +428,3 @@ Limits / pending tests:
 Revisit trigger:
 Supersedes / superseded by:
 Commit or report reference (only when actually available):
-
