@@ -412,9 +412,239 @@ Review: commands and field names checked against the implemented scripts and pro
 The actual checklist has not yet been executed with the headset. Append the results
 as a new entry, rather than changing this handoff into a retrospective claim of success.
 
+## D016 — Boundary calibration resolved apparent excess headset height
+
+Recorded: 2026-09-06 (America/New_York).
+Source: Reagan's guided Air Link self-test and supplied Unity screenshots.
+Status: positioning issue resolved by user report; recording validation pending.
+
+Context: Reagan created ValidationRoom2x2, inspected the generated platform and
+assigned the logger's XR Origin reference. Before recording, the headset view felt
+too high. Reagan reports standing height of 5 ft 11 in (approximately 1.8034 m).
+
+Evidence before calibration: during Play Mode the XR Origin Y was approximately
+zero (-4.47e-08), Camera Offset Y was zero, and Current Tracking Origin Mode was
+Floor. Main Camera local Y was 2.233746 m. The installed XROrigin implementation
+sets Camera Offset Y to zero in Floor mode, consistent with the runtime screenshot.
+The excessive height was therefore not explained by the earlier edit-mode camera
+offset of 1.36144 m.
+
+Action and observation: Reagan recalibrated the Quest boundary/floor reference,
+reconnected Air Link, and repeated the positioning check. The subsequent screenshot
+shows Main Camera local Y = 1.64285 m; Reagan reports the boundary change solved
+the problem and the view now feels realistic. The approximately 0.591 m difference
+is between two snapshots, not a controlled measurement of calibration error.
+
+Decision: check the headset floor reference before compensating with Unity camera
+offsets, rig scale, or platform height. No compensating Unity code change was made.
+Use a no-recording positioning check before the first baseline after boundary changes.
+
+Why: changing virtual geometry to cancel an external tracking-reference error could
+hide a calibration problem and compromise meter-scale interpretation.
+
+Limits: snapshots and the user's report strongly support the boundary explanation;
+they do not establish exact physical eye-height accuracy or certify tracking scale.
+The latest screenshot alone does not reverify every ancestor transform. No new raw
+session has yet been assessed. Stationary recording integrity and the square test
+remain pending. No claim is made that Phase 0 has passed.
+
+Next checkpoint: 30-second stationary_self_test, P000, Air Link; validate the new
+schema 0.2.0 export before physical-square recording. Revisit calibration if floor
+height becomes implausible or the boundary/tracking reference changes.
+
+## D017 — First headset export passes structural checks but includes startup transients
+
+Recorded: 2026-09-06 (America/New_York).
+Source: Reagan's Console screenshot and read-only analysis of the exported files.
+Session: 20260906_210440_db78b8cce4ef4c33afe1aab0bc23ab12.
+Metadata: P000, stationary_self_test, trial 1, Air Link; schema 0.2.0.
+
+Evidence: 1,994 samples over a manifest duration of 30.002404 seconds; 166 missed
+deadlines. Validator reports no integrity errors, zero non-increasing timestamp
+intervals, no nonfinite poses, and no quaternion-norm errors. Overall observation
+rate is 66.5489 Hz. Warnings are gap_over_three_periods and the expected
+hardware_tracking_validity_unverified. All four pose references produced finite data.
+
+Largest gap is 1.895019 seconds, from t=0.0402433 to 1.9352623, across one Unity
+frame increment. Four intervals exceed three target periods. Excluding only this
+largest gap yields about 71.0087 Hz, a diagnostic calculation rather than a repaired
+dataset or a redefinition of the full-session rate.
+
+The first row has head Y=1.36144; shortly afterward head Y=0.10001 and origin
+Y=0.10001. After t>=3 seconds, head Y ranges 1.47041 to 1.66714 and the origin
+position is constant. Finite startup poses thus pass structural checks without
+establishing valid settled tracking. Exact causes of each transient remain unproven.
+
+Decision: retain this as startup/engineering evidence, not a clean stationary
+baseline or square-test pass. Establish settled tracking before recording the next
+baseline. A delayed or explicit start is the proposed next recording-control
+improvement; it has not been implemented in this entry. Do not silently trim raw data.
+
+Report saved in the task workspace as vr-integrity-work/stationary_20260906_210440_report.json,
+including SHA-256 hashes of the source manifest and telemetry. Raw exports unchanged.
+Next checkpoint: agree/implement a post-initialization start, then repeat the baseline.
+
+## D018 — Explicit manual recording start after XR initialization
+
+Recorded: 2026-09-06 (America/New_York).
+Source: first baseline's startup transients (D017), followed by Reagan asking to proceed.
+Status: implemented; static compilation checked; headset repeat pending.
+
+Decision: expose Start Recording and Stop Recording and Save in the Session Manager
+component context menu. Default auto-start to false for newly added components.
+Existing serialized scene settings retain their values and must be unchecked explicitly.
+Start refuses Edit Mode or a disabled component. The existing 30-second auto-stop
+remains measured from the actual StartSession call, not from entering Play Mode.
+
+Why: the operator can allow Air Link and tracking to initialize, check floor height,
+then start the baseline without restarting Play Mode. A fixed delay alone cannot
+prove tracking readiness. This is an operator readiness check, not an automatic
+tracking-validity guarantee. A headset controller binding or countdown can follow
+if desktop interaction materially affects the protocol.
+
+Validation: changed C# compiled against the installed Unity assemblies and existing
+production scheduler assertions executed successfully. Unity menu interaction and
+recording behavior require the next headset run. Raw session files and scene edits
+were preserved; schema remains 0.2.0.
+
+Procedure: outside Play, disable Auto Start On Play, set stationary_self_test trial 2
+and auto-stop 30 seconds, and save. Enter Play, wait until view and tracking settle,
+then use TelemetrySystem > Session Manager header menu > Start Recording. Remain
+stationary with tracked controllers until export. Record any setup movement; do not
+silently remove it. The checklist's immediate-on-Play baseline instruction is
+superseded for this guided validation by this manual-start procedure.
+
+Revisit when: manual starts are inconvenient, tracking flags are implemented, or
+trials require precise stimulus/task onset independent of operator interaction.
+
+## D019 — Professor interest retained as a deferred opportunity
+
+Recorded: 2026-09-14 (America/New_York).
+Source: Reagan's report of a meeting with his OS professor.
+Status: contextual note only; explicitly deferred by Reagan.
+
+The professor is interested in this project and needs telemetry logging in his own
+platform. A possible much-later direction is a functioning reusable tool invoked
+through an API. Reagan explicitly requested that this perspective NOT drive current
+iteration. No API, SDK, service abstraction, distribution packaging, compatibility
+promise, or external integration is being designed or built for that purpose now.
+Revisit only when Reagan explicitly brings the integration into scope.
+
+## D020 — Continue task development while physical validation is pending
+
+Recorded: 2026-09-14.
+Source: Reagan asked whether headset testing could wait, then approved building the
+next task flow after tradeoffs were discussed.
+Status: agreed development sequence; measurement validation remains incomplete.
+
+Decision: build session/trial controls, event logging, and the Object-Approach Room
+without requiring another headset session first. Treat validation as a gate before
+trusting behavioral data, not as a ban on useful engineering work. No participant
+collection, cognitive interpretation, or ML analysis is authorized by this change.
+
+Why: the first export demonstrated basic recording and eliminated duplicate times,
+while also exposing startup transients. The next headset session can jointly assess
+manual start, square calibration, and the first task, rather than test isolated edits.
+The earlier blanket stop on development was broader than necessary. D017's data
+limitations and D018's manual-start requirement still apply.
+
+## D021 — Object-Approach controls and trial termination
+
+Recorded: 2026-09-14.
+Source: options presented to Reagan; Reagan said to proceed with the recommended
+in-headset panel and manual confirmation plus a maximum-duration timeout.
+Status: implemented; software checks performed; headset usability pending.
+
+Options discussed: Inspector-only controls are cheaper but awkward in-headset;
+an in-headset panel requires more work but supports self-testing and repeated trials.
+Timed-only completion standardizes duration but can interrupt an unfinished approach.
+Distance thresholds are automatic but do not prove the task is complete. Manual
+confirmation records a declaration and introduces a button interaction.
+
+Decision: in-headset Begin/Ready/Complete/Stop controls with Inspector fallbacks.
+Start the session only after the operator judges tracking settled. Each trial has
+a countdown, stationary neutral target, explicit confirmation or timeout, and rest.
+At an exact deadline timeout takes precedence. Stop is available throughout and
+cancels a countdown or ends an active trial with a distinct reason.
+
+Implementation defaults: three trials, three-second countdown, 30-second timeout,
+minimum five-second rest followed by explicit Ready. These are editable engineering
+defaults, NOT an approved final research protocol. A hitch during countdown delays
+actual appearance; it does not fabricate an earlier target or consume the active
+trial's entire duration. Pose capture continues across rests and countdowns.
+
+Prototype panel placement is head-relative below the central field of view so it
+remains accessible after moving. This is a provisional UI implementation, not a
+claim of research suitability. It can affect head movement/attention and must be
+evaluated before using scanning or facing-time outcomes. The existing XR UI rays
+operate its buttons. Controller gestures are not introduced in this iteration.
+
+The target is a 0.3 m neutral sphere at world (0,1.1,1.5), with a blue start marker
+at world X/Z zero. The separate room has a 6 x 8 m floor and three walls. This does
+not change the two-meter calibration platform. Starting position is instructed,
+not automatically verified; no rig teleport or recenter is used between trials.
+Locomotion mode is an explicit descriptive field. Physical space is not inferred
+from the virtual floor. Keep geometry/settings unchanged within a recording.
+
+Revisit: UI placement/comfort, start-position enforcement, trial duration, target
+distance and completion instructions after the combined headset test. Discuss
+material alternatives with Reagan before building a different approach.
+
+## D022 — Shared-clock event stream and separate event schema
+
+Recorded: 2026-09-14.
+Status: implemented; validator and state-transition checks completed.
+
+Decision: add events.csv with t_sec, sequence, event_type, trial_number, payload_json.
+Use the logger's elapsed clock. Sequence disambiguates equal-time events; event times
+may be equal while pose times must increase. Trial/stimulus events carry target
+world pose/scale and settings. Trial end reasons distinguish confirmation, timeout,
+operator stop, component/task disable, and shutdown as applicable.
+
+The pose schema stays 0.2.0. The optional event extension declares its own 0.1.0
+schema, filename, and count in the manifest. Old pose-only recordings remain valid
+inputs. In repeated-trial sessions, event trial_number is authoritative; the legacy
+manifest trial_number remains session metadata. The user need not split each trial
+into a separate file to align events and poses.
+
+Activation/deactivation events occur after the SetActive command. They identify
+application commands, not measured photons/display onset or verified awareness.
+No eye tracking, reaction-time feature, or inferred cognitive state is added.
+
+Stop notifies the task before ending telemetry, allowing target cleanup and terminal
+trial events inside the session window. Telemetry and events are written before the
+manifest. Failed writes retain buffers for retry; this remains non-transactional
+and not crash-proof. Avoid describing the export as durable until it completes.
+
+Validation extends existing pose checks with event schema/count/order, session
+boundaries, trial matching, target visibility pairing, finite target coordinates,
+termination reasons, and source hashes. Equal timestamps and escaped JSON are
+tested. This is structural validation, not proof that a participant followed the task.
+
+Tests: production C# state machine/event buffer assertions cover double clicks,
+countdown/rest, manual and timeout completion, exact deadlines, abort/cancellation,
+clock reversal, long stalls, and escaping. All 31 Python tests passed. Unity batch
+compilation and scene-wiring checks passed; headset interaction remains pending.
+
+Play Mode evidence, September 14 local / September 15 UTC: the first smoke driver
+attempted a click before the panel's next-frame interactability update, so it was
+changed to wait for the actual button state. That failed synthetic export was
+retained. The repeat passed through the real panel button callbacks, produced one
+manual_confirmation and one timeout, hid the target, and exported successfully.
+Session 20260915_013317_0a193f61fd44497ea9538f4e9f8b29b1 is explicitly labeled
+SYNTHETIC / synthetic_editor_smoke. It contains 370 pose samples and 17 events.
+The full Python validator found no structural errors and both expected outcomes.
+Timing gaps, unavailable hardware validity, and unverified display onset remain
+warnings. This test used no headset and no actual controller ray selection; it is
+not a clean behavioral baseline or validation of UI appearance/comfort.
+
+Validator version is now 0.2.0 to identify the added event checks separately from
+the unchanged pose schema. Batch logs and synthetic validation reports are in the
+task workspace's vr-object-approach folder; raw synthetic sessions stay outside Git.
+
 ## Template for the next entry
 
-### D016 — [Decision title]
+### D023 — [Decision title]
 Recorded local date/time and timezone:
 Source/participants:
 Status:

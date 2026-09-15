@@ -11,6 +11,7 @@ import json
 import math
 from pathlib import Path
 from statistics import median
+from validate_events import check_events
 
 COMPONENTS = ('px', 'py', 'pz', 'rx', 'ry', 'rz', 'rw')
 
@@ -84,7 +85,7 @@ def validate(manifest, rows, columns):
                 metrics['x_span_m'] = max(pose[0] for pose in finite)-min(pose[0] for pose in finite)
                 metrics['z_span_m'] = max(pose[2] for pose in finite)-min(pose[2] for pose in finite)
     warnings.append('hardware_tracking_validity_unverified')
-    return {'validator_version': '0.1.0', 'schema_version': version,
+    return {'validator_version': '0.2.0', 'schema_version': version,
             'integrity_pass': not errors, 'square_test_status': 'not_assessed',
             'errors': errors, 'warnings': warnings, 'metrics': metrics,
             'thresholds': {'quaternion_norm_tolerance': 0.01,
@@ -108,6 +109,8 @@ def validate_folder(folder):
     report = validate(manifest, rows, columns)
     report['source_sha256'] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                                for p in (manifest_path, telemetry_path)}
+    check_events(folder, manifest, report)
+    report['integrity_pass'] = not report['errors']
     return report
 
 

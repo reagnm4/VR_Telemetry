@@ -1,5 +1,10 @@
 # Phase 0 — recording integrity and exact square validation
 
+> Update 2026-09-06 (D018): keep Auto Start On Play disabled. After entering Play
+> and confirming settled headset tracking, use the Session Manager component
+> header's context menu > Start Recording. Auto-stop runs from that moment.
+> This supersedes the automatic-on-Play instructions below for baseline tests.
+
 Updated 2026-09-04 (America/New_York). Read DESIGN_DECISIONS.md for rationale.
 This procedure is self-testing of the instrument, not a behavioral experiment.
 
