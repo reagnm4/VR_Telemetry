@@ -2,7 +2,8 @@
 analyze_session.py
 
 Loads one recording session (manifest.json + telemetry.csv) produced by the Unity
-TelemetryLogger, runs sanity checks, and plots the user's path and head height.
+TelemetryLogger, requires structural validation to pass, then plots the user's path
+and head height.
 
 This is the VALIDATION tool. Before trusting ANY behavioral data, do the square test:
 walk a roughly 2 x 2 meter square in the empty room, then run this. The printed X span
@@ -27,11 +28,17 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from validate_session import validate_folder
+
 
 def load_session(folder: Path):
-    manifest = json.loads((folder / "manifest.json").read_text())
-    df = pd.read_csv(folder / "telemetry.csv")
-    return manifest, df
+    folder = folder.resolve()
+    validation = validate_folder(folder)
+    if not validation["integrity_pass"]:
+        raise ValueError("Session failed structural validation: " + ", ".join(validation["errors"]))
+    manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8-sig"))
+    df = pd.read_csv(folder / manifest.get("telemetry_file", "telemetry.csv"))
+    return manifest, df, validation
 
 
 def quaternion_forward(qx, qy, qz, qw):
@@ -46,7 +53,7 @@ def quaternion_forward(qx, qy, qz, qw):
     return np.stack([fx, fy, fz], axis=-1)
 
 
-def sanity_report(manifest, df):
+def sanity_report(manifest, df, validation):
     t = df["t_sec"].to_numpy()
     duration = (t[-1] - t[0]) if len(t) > 1 else 0.0
     eff_rate = (len(t) - 1) / duration if duration > 0 else 0.0
@@ -73,6 +80,9 @@ def sanity_report(manifest, df):
     print(f"Z span (m)      : {z_span:.2f}  ({np.nanmin(pz):.2f} to {np.nanmax(pz):.2f})")
     print(f"head height (m) : {np.nanmin(py):.2f} to {np.nanmax(py):.2f}")
     print(f"horiz path len  : {path_len:.2f} m")
+    print(f"integrity gate  : PASS ({validation['validator_version']})")
+    if validation["warnings"]:
+        print(f"validation notes: {', '.join(validation['warnings'])}")
 
     # Tracking dropouts: the logger writes NaN when a transform is missing.
     # Surface them here so flaky tracking can't hide inside a passing report.
@@ -133,8 +143,12 @@ def main():
         print("Usage: python analyze_session.py /path/to/sessions/<session_id>")
         sys.exit(1)
     folder = Path(sys.argv[1])
-    manifest, df = load_session(folder)
-    sanity_report(manifest, df)
+    try:
+        manifest, df, validation = load_session(folder)
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+        print(f"Cannot analyze session: {exc}")
+        sys.exit(2)
+    sanity_report(manifest, df, validation)
     plot_session(manifest, df)
 
 

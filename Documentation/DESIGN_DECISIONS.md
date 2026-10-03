@@ -642,9 +642,125 @@ Validator version is now 0.2.0 to identify the added event checks separately fro
 the unchanged pose schema. Batch logs and synthetic validation reports are in the
 task workspace's vr-object-approach folder; raw synthetic sessions stay outside Git.
 
+## D023 — Validator-gated descriptive Object-Approach analysis
+
+Recorded: 2026-10-03 (America/New_York).
+Source: unattended pre-human-testing audit authorized by Reagan.
+Status: implemented and software-tested; interpretation thresholds remain provisional.
+
+Problem: the prototype records poses and trial events but had no reproducible bridge
+from those raw files to the Phase 1 measurements. Manually inspecting CSVs would make
+definitions drift between runs and could allow invalid recordings into analysis.
+
+Decision: add a standard-library Python analysis that first runs the structural
+validator and refuses a failed session. For each completed trial, use target appearance
+and trial-end events as the application-time window and report event duration, included
+pose coverage, horizontal X-Z path length, start/closest/end distance to the target
+center, approach change, median and 95th-percentile horizontal speed, and descriptive
+head-to-target angle summaries. Store raw-source hashes and validator warnings in the
+analysis report. Output is JSON and existing files are never overwritten.
+
+Alternatives considered: analyze immediately without gating (rejected because corrupt
+timing or poses can silently contaminate features); add the calculations in Unity
+(rejected because D001 keeps derivation reproducible in Python); depend on pandas/numpy
+(not selected for this first extractor because the standard library is sufficient and
+keeps validation usable on a clean machine); report 3-D or sphere-surface distance
+(not selected because the current task is floor-plane approach and the precise target
+boundary/reach definition is not yet approved).
+
+The default 30-degree head-alignment fraction is an editable engineering threshold.
+It is labeled as headset direction, never gaze or attention. Slowdown location, dwell,
+trial exclusion, aggregation across trials/people, and cognitive or affective labels are
+deferred because each requires a protocol definition or human evidence. Event time is
+still an application command, so the report also exposes the first/last included pose
+times rather than implying frame-perfect stimulus onset.
+
+Validation: analysis tests cover a known straight synthetic approach, validator-gate
+refusal, invalid threshold refusal, and retention of a trial too short for movement
+metrics. Event checks now require complete, consecutive trial lifecycles and complete
+target visibility for Object-Approach while preserving non-target trial compatibility.
+The full Python suite passed 39 tests. The retained synthetic editor smoke session
+analyzed successfully: its near-instant manual trial was explicitly labeled
+insufficient_pose_samples, while its five-second timeout trial produced complete
+stationary descriptive metrics. No headset evidence was produced.
+
+Revisit when: the headset task is accepted, target geometry changes, a distance-to-
+surface definition is desired, or Reagan approves operational definitions for dwell
+and slowdown. Analysis schema version is 0.1.0 and independent of raw schemas.
+
+## D024 — Fail-safe stop and staged session export
+
+Recorded: 2026-10-03 (America/New_York).
+Source: unattended failure-mode review authorized by Reagan.
+Status: implemented; clean Unity compilation and Play Mode smoke export passed.
+
+Problem: a task subscriber exception during SessionStopping could escape before the
+logger stopped, leaving pose capture active and preventing export. Direct writes also
+made each data file visible while it was still being replaced, although writing the
+manifest last already prevented a partial folder from looking complete.
+
+Decision: invoke stop subscribers individually and log their exceptions, but always
+stop telemetry and snapshot duration/counts in a finally block. Write telemetry,
+events, and manifest through sibling `.tmp` files moved to final names; keep the
+manifest last. If any write fails, retain the in-memory buffers and pending-export
+state so Stop Recording and Save can retry. Existing final files may be replaced on a
+retry for that same unique session folder.
+
+Alternatives considered: allow callback errors to abort shutdown (rejected because an
+instrument must fail closed by ending capture); swallow export errors and clear state
+(rejected because it could silently lose a run); build a database or journaling system
+(deferred as disproportionate for pilot-length local sessions); claim atomic durability
+(rejected because filesystem, power-loss, and storage semantics are not proven).
+
+Limits: this improves orderly failure and retry behavior but does not make export
+crash-proof. A callback failure can still yield a structurally invalid event stream,
+which the validator must reject. A folder without manifest.json remains incomplete and
+must not be treated as a session. Raw session deletion or automatic repair is not added.
+
+Validation: Unity rebuilt the isolated checkout and compiled all project assemblies
+without C# errors. The Play Mode smoke test then completed one manual trial and one
+timeout through the real panel callbacks, saved 369 poses and 17 events through the
+staged export path, and exited successfully. The Python validator reported integrity
+pass with no structural errors; the expected headless timing and hardware-validity
+warnings remain. A Unity Search indexing exception and headless OpenXR diagnostics
+appeared independently of the task; neither interrupted the passing smoke sequence.
+
+Revisit when: sessions become long enough to require streaming, data must survive power
+loss, storage moves off-device, or formal durability requirements are established.
+
+## D025 — Integrity-gate every analysis entry point
+
+Recorded: 2026-10-03 (America/New_York).
+Source: unattended review of previously written analysis code.
+Status: implemented and exercised on the retained synthetic session.
+
+Problem: validate_session.py existed as a required separate step, but the older
+square-test plotting tool loaded telemetry directly. A user could therefore generate
+a plausible plot and descriptive numbers from a session that the validator would
+reject. Written procedure alone was weaker than enforcing the invariant in code.
+
+Decision: analyze_session.py now calls the structural validator before reading data
+for metrics or plotting and exits without analysis on any integrity error. It loads
+the manifest-declared telemetry filename after the validator confirms the path. The
+sanity report prints the validator version and warnings with the descriptive output.
+The new Object-Approach analyzer follows the same gate.
+
+Alternative considered: leave validation as a manual prerequisite. Rejected because
+the AGENTS.md research rule says to run integrity validation before interpreting
+timing-dependent features, and a forgotten command should not bypass that rule.
+Warnings still permit analysis because they communicate limitations rather than
+structural corruption; they are carried into the output and remain part of review.
+
+Validation: the gated loader successfully read the retained 370-row synthetic smoke
+session after validator pass. The 39-test Python suite also passed. This establishes
+software behavior only, not square calibration or headset accuracy.
+
+Revisit when: distinct validators are introduced for new schemas, or warning classes
+gain protocol-specific exclusion rules.
+
 ## Template for the next entry
 
-### D023 — [Decision title]
+### D026 — [Decision title]
 Recorded local date/time and timezone:
 Source/participants:
 Status:

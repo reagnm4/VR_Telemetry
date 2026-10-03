@@ -28,10 +28,14 @@ def check_events(folder, manifest, report):
     if not rows or rows[0]['event_type'] != 'session_started' or rows[-1]['event_type'] != 'session_stopped':
         errors.append('missing_session_event_boundaries')
     previous = 0.0
+    target_required = (str(manifest.get('environment_id', '')).startswith('object_approach') or
+                       any(row.get('event_type') in ('target_appeared', 'target_disappeared') for row in rows))
     active = None
     visible = None
     outcomes = {}
     started_trials = set()
+    appeared_trials = set()
+    ended_trials = set()
     for index, row in enumerate(rows):
         try:
             t = float(row['t_sec'])
@@ -55,18 +59,22 @@ def check_events(folder, manifest, report):
             elif kind == 'trial_ended':
                 if active != trial or trial <= 0:
                     errors.append('unmatched_trial_end')
+                if target_required and visible != trial:
+                    errors.append('trial_ended_without_visible_target')
                 active = None
+                ended_trials.add(trial)
                 reason = data.get('reason')
                 if not isinstance(reason, str) or not reason:
                     errors.append('missing_trial_end_reason')
                 else:
                     outcomes[reason] = outcomes.get(reason, 0) + 1
             elif kind == 'target_appeared':
-                if active != trial or visible is not None:
+                if active != trial or visible is not None or trial in appeared_trials:
                     errors.append('invalid_target_appearance')
                 visible = trial
+                appeared_trials.add(trial)
             elif kind == 'target_disappeared':
-                if visible != trial or trial <= 0:
+                if visible != trial or trial <= 0 or trial not in ended_trials:
                     errors.append('unmatched_target_disappearance')
                 visible = None
             if kind in ('target_appeared', 'target_disappeared'):
@@ -77,6 +85,10 @@ def check_events(folder, manifest, report):
             errors.append('malformed_event')
     if active is not None or visible is not None:
         errors.append('unfinished_trial_or_visible_target')
+    if started_trials and started_trials != set(range(1, max(started_trials) + 1)):
+        errors.append('nonconsecutive_trial_numbers')
+    if started_trials != ended_trials or (target_required and started_trials != appeared_trials):
+        errors.append('incomplete_trial_lifecycle')
     report['metrics']['event_count'] = len(rows)
     report['metrics']['trial_outcomes'] = outcomes
     report['warnings'].append('event_times_are_application_commands_not_verified_display_onsets')

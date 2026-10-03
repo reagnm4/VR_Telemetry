@@ -103,6 +103,7 @@ the event trial_number identifies repeated trials.
 ```powershell
 Set-Location 'C:\Users\reaga\VR_Telemetry'
 python -B Analysis/validate_session.py 'C:/path/to/session' --output 'C:/path/to/new_report.json'
+python -B Analysis/analyze_object_approach.py 'C:/path/to/session' --output 'C:/path/to/new_approach_report.json'
 python -B -m unittest discover -s Analysis -p 'test_*.py' -v
 ```
 
@@ -113,6 +114,21 @@ It preserves hashes for all three source files and summarizes outcomes.
 Equal event timestamps are valid; duplicate pose timestamps are not.
 A structurally valid early-stop session may still have insufficient pose samples
 for measurement; it remains saved and must not be deleted to conceal an aborted run.
+
+Run the Object-Approach analysis only after validation passes. It reports one
+descriptive record per completed trial: event duration, pose coverage, horizontal
+path length, start/closest/end horizontal distance to the target center, approach
+change, median and 95th-percentile horizontal speed, and headset-to-target angle.
+The default 30-degree head-alignment fraction is an explicit engineering threshold
+and can be changed with `--head-alignment-degrees`. It is a head-direction proxy,
+not eye gaze, attention, intent, or an affective/cognitive measure. The report stores
+source hashes and validation warnings so a summary remains traceable to its raw files.
+
+Distance is measured in the X-Z floor plane to the target center. It is not distance
+to the sphere surface or hand reach. Event duration uses application command times;
+the first/last included pose timestamps are reported separately because events can
+fall between samples. Slowdown-point, dwell, and inferential labels remain deferred
+until the headset procedure and operational definitions are agreed.
 
 ## What has and has not been established
 

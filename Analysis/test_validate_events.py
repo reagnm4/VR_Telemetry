@@ -91,6 +91,28 @@ class EventValidationTests(unittest.TestCase):
         for i, row in enumerate(self.events): row[1] = i
         self.assertIn('unfinished_trial_or_visible_target', self.report()['errors'])
 
+    def test_trial_must_show_target(self):
+        self.events.pop(2)
+        for i, row in enumerate(self.events): row[1] = i
+        errors = self.report()['errors']
+        self.assertIn('trial_ended_without_visible_target', errors)
+        self.assertIn('incomplete_trial_lifecycle', errors)
+
+    def test_target_cannot_disappear_before_trial_end(self):
+        self.events[3], self.events[4] = self.events[4], self.events[3]
+        for i, row in enumerate(self.events): row[1] = i
+        self.assertIn('unmatched_target_disappearance', self.report()['errors'])
+
+    def test_trial_numbers_are_consecutive(self):
+        for row in self.events:
+            if row[3] == 1: row[3] = 2
+        self.assertIn('nonconsecutive_trial_numbers', self.report()['errors'])
+
+    def test_non_target_trial_schema_remains_supported(self):
+        self.events = [self.events[0], self.events[1], self.events[3], self.events[-1]]
+        for i, row in enumerate(self.events): row[1] = i
+        self.assertTrue(self.report()['integrity_pass'])
+
     def test_count_mismatch(self):
         self.manifest['event_count'] = 100
         self.assertIn('event_count_mismatch', self.report()['errors'])

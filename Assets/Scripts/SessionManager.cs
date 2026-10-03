@@ -103,26 +103,57 @@ public class SessionManager : MonoBehaviour
             stopping = true;
             try
             {
-                SessionStopping?.Invoke(reason);
-                RecordEvent("session_stopped", 0, JsonUtility.ToJson(new StopPayload { reason = reason }));
+                InvokeStoppingHandlers(reason);
+                try { RecordEvent("session_stopped", 0, JsonUtility.ToJson(new StopPayload { reason = reason })); }
+                catch (Exception ex) { Debug.LogException(ex, this); }
             }
-            finally { stopping = false; }
-            telemetry.StopLogging();
-            manifest.end_utc = DateTime.UtcNow.ToString("o");
-            manifest.duration_sec = telemetry.ElapsedSeconds;
-            manifest.sample_count = telemetry.SampleCount;
-            manifest.missed_sample_deadlines = telemetry.MissedSampleCount;
-            manifest.event_count = events.Count;
-            active = false;
-            pendingExport = true;
+            finally
+            {
+                // A task callback must never leave pose capture running indefinitely.
+                telemetry.StopLogging();
+                manifest.end_utc = DateTime.UtcNow.ToString("o");
+                manifest.duration_sec = telemetry.ElapsedSeconds;
+                manifest.sample_count = telemetry.SampleCount;
+                manifest.missed_sample_deadlines = telemetry.MissedSampleCount;
+                manifest.event_count = events.Count;
+                active = false;
+                pendingExport = true;
+                stopping = false;
+            }
         }
-        // Manifest last: its presence indicates these writes completed.
-        // On failure the buffer survives and StopSession can retry.
-        File.WriteAllText(Path.Combine(sessionFolder, "telemetry.csv"), telemetry.GetCsv());
-        File.WriteAllText(Path.Combine(sessionFolder, "events.csv"), events.GetCsv());
-        File.WriteAllText(Path.Combine(sessionFolder, "manifest.json"), JsonUtility.ToJson(manifest, true));
-        pendingExport = false;
-        Debug.Log($"[SessionManager] Session stopped. {manifest.sample_count} samples written to {sessionFolder}");
+        try
+        {
+            // Manifest last: its presence indicates both data files reached final names.
+            // Temporary files and in-memory buffers allow a failed export to be retried.
+            WriteAtomically(Path.Combine(sessionFolder, "telemetry.csv"), telemetry.GetCsv());
+            WriteAtomically(Path.Combine(sessionFolder, "events.csv"), events.GetCsv());
+            WriteAtomically(Path.Combine(sessionFolder, "manifest.json"), JsonUtility.ToJson(manifest, true));
+            pendingExport = false;
+            Debug.Log($"[SessionManager] Session stopped. {manifest.sample_count} samples written to {sessionFolder}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[SessionManager] Export incomplete; retry Stop Recording and Save. {ex.Message}", this);
+            throw;
+        }
+    }
+
+    private void InvokeStoppingHandlers(string reason)
+    {
+        if (SessionStopping == null) return;
+        foreach (Action<string> handler in SessionStopping.GetInvocationList())
+        {
+            try { handler(reason); }
+            catch (Exception ex) { Debug.LogException(ex, this); }
+        }
+    }
+
+    private static void WriteAtomically(string path, string contents)
+    {
+        string temporaryPath = path + ".tmp";
+        File.WriteAllText(temporaryPath, contents);
+        if (File.Exists(path)) File.Delete(path);
+        File.Move(temporaryPath, path);
     }
 
     [Serializable] private class StopPayload { public string reason; }
