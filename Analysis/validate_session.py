@@ -38,6 +38,15 @@ def _parse_utc(value):
         return None
 
 
+def _object_without_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f'Duplicate JSON key: {key}')
+        result[key] = value
+    return result
+
+
 def validate(manifest, rows, columns):
     errors, warnings, metrics = [], [], {'sample_count': len(rows)}
     version = manifest.get('schema_version')
@@ -86,6 +95,8 @@ def validate(manifest, rows, columns):
         errors.append('duplicate_columns')
     if set(required) - set(columns):
         errors.append('missing_columns')
+    if not _valid_nonnegative_integer(manifest.get('sample_count')):
+        errors.append('invalid_sample_count')
     if manifest.get('sample_count') != len(rows):
         errors.append('manifest_count_mismatch')
     if len(rows) < 2:
@@ -98,6 +109,8 @@ def validate(manifest, rows, columns):
     valid_duration = isinstance(duration, (float, int)) and not isinstance(duration, bool) and math.isfinite(duration) and duration >= 0
     if not valid_duration:
         errors.append('invalid_manifest_duration')
+    if columns != required:
+        errors.append('invalid_telemetry_columns')
     if 'missing_columns' not in errors:
         try:
             values = [{k: float(row[k]) for k in required} for row in rows]
@@ -144,7 +157,7 @@ def validate(manifest, rows, columns):
                 metrics['x_span_m'] = max(pose[0] for pose in finite)-min(pose[0] for pose in finite)
                 metrics['z_span_m'] = max(pose[2] for pose in finite)-min(pose[2] for pose in finite)
     warnings.append('hardware_tracking_validity_unverified')
-    return {'validator_version': '0.3.0', 'schema_version': version,
+    return {'validator_version': '0.3.1', 'schema_version': version,
             'integrity_pass': not errors, 'square_test_status': 'not_assessed',
             'errors': errors, 'warnings': warnings, 'metrics': metrics,
             'thresholds': {'quaternion_norm_tolerance': 0.01,
@@ -155,7 +168,8 @@ def validate(manifest, rows, columns):
 def validate_folder(folder):
     folder = Path(folder).resolve()
     manifest_path = folder / 'manifest.json'
-    manifest = json.loads(manifest_path.read_text(encoding='utf-8-sig'))
+    manifest = json.loads(manifest_path.read_text(encoding='utf-8-sig'),
+                          object_pairs_hook=_object_without_duplicate_keys)
     if not isinstance(manifest, dict):
         raise ValueError('Manifest must be an object')
     telemetry_path = (folder / manifest.get('telemetry_file', 'telemetry.csv')).resolve()

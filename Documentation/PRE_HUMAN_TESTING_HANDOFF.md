@@ -24,7 +24,7 @@ participant collection.
   uses temporary files, and publishes the manifest last.
 - Synthetic tests cover the state machine, CSV/JSON escaping, invalid input, event
   lifecycle, feature calculations, short-trial retention, and compatibility with
-  pose-only and non-target event sessions. The current Python suite has 44 tests.
+  pose-only and non-target event sessions. The current Python suite has 48 tests.
 
 ## Still requires Reagan in the headset
 

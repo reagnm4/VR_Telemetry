@@ -5,6 +5,15 @@ import json
 import math
 
 
+def _object_without_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f'Duplicate event payload key: {key}')
+        result[key] = value
+    return result
+
+
 def check_events(folder, manifest, report):
     if not manifest.get('events_file'):
         return  # Legacy pose-only sessions remain supported.
@@ -41,7 +50,9 @@ def check_events(folder, manifest, report):
             t = float(row['t_sec'])
             sequence = int(row['sequence'])
             trial = int(row['trial_number'])
-            data = json.loads(row['payload_json'], parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
+            data = json.loads(row['payload_json'],
+                              parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+                              object_pairs_hook=_object_without_duplicate_keys)
             if not isinstance(data, dict) or None in row or any(v is None for v in row.values()):
                 raise ValueError('Malformed event')
             duration = float(manifest['duration_sec'])

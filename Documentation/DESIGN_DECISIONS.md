@@ -861,9 +861,38 @@ known duplicate timestamps, not for compatible coordinate wording.
 Revisit when: identifiers move to a controlled registry, protocol versions become
 mandatory, or manifest validation is formalized as JSON Schema.
 
+## D029 — Reject ambiguous counts, columns, and duplicate JSON keys
+
+Recorded: 2026-10-03 (America/New_York).
+Source: final unattended validator proofing authorized by Reagan.
+Status: implemented and regression-tested as validator 0.3.1.
+
+Problem: Python treats Boolean values as integers, CSV consumers often tolerate extra
+or reordered columns, and the default JSON parser silently keeps the last duplicate
+key. Those behaviors could allow an ambiguous manifest or payload to appear valid even
+though a different parser might interpret it differently.
+
+Decision: require sample_count to be an actual non-negative integer; require telemetry
+headers to exactly match the declared schema's names and order; reject duplicate keys
+at any depth of manifest JSON; and treat duplicate event-payload keys as malformed
+events. Existing missing/duplicate-column and row-shape checks remain.
+
+Alternatives considered: normalize/reorder columns during loading (rejected because raw
+schema deviations should remain visible); accept JSON's last value (rejected because it
+hides contradictory evidence); coerce Boolean or numeric-string counts (rejected
+because schema validation should not invent types).
+
+Validation: the Python suite passed 48 tests, including Boolean count, extra/reordered
+columns, duplicate manifest keys, and duplicate event payload keys. Retained schema
+0.2.0 sessions still pass with their existing quality/provenance warnings. Raw files
+were not changed.
+
+Revisit when: an intentional schema adds columns, which must receive a new raw schema
+version rather than relaxing this check.
+
 ## Template for the next entry
 
-### D029 — [Decision title]
+### D030 — [Decision title]
 Recorded local date/time and timezone:
 Source/participants:
 Status:

@@ -44,6 +44,11 @@ class ValidationTests(unittest.TestCase):
         self.manifest['sample_count'] = 4
         self.assertIn('manifest_count_mismatch', self.report()['errors'])
 
+    def test_boolean_sample_count_rejected(self):
+        self.manifest['sample_count'] = True
+        self.rows = self.rows[:1]
+        self.assertIn('invalid_sample_count', self.report()['errors'])
+
     def test_partial_head_pose_rejected(self):
         self.rows[1]['hmd_rz'] = float('nan')
         self.assertIn('hmd_nonfinite_pose', self.report()['errors'])
@@ -63,6 +68,12 @@ class ValidationTests(unittest.TestCase):
     def test_missing_column(self):
         self.columns.remove('hmd_px')
         self.assertIn('missing_columns', self.report()['errors'])
+
+    def test_extra_or_reordered_columns_rejected(self):
+        self.columns.append('mystery')
+        self.assertIn('invalid_telemetry_columns', self.report()['errors'])
+        self.columns = list(reversed(self.columns[:-1]))
+        self.assertIn('invalid_telemetry_columns', self.report()['errors'])
 
     def test_zero_rate(self):
         self.manifest['sample_rate_hz'] = 0

@@ -65,6 +65,23 @@ class EventValidationTests(unittest.TestCase):
         self.events[-1][4]['note'] = 'quote " comma,\nand newline'
         self.assertTrue(self.report()['integrity_pass'])
 
+    def test_duplicate_payload_key_rejected(self):
+        self.report()
+        with (self.folder/'events.csv').open(newline='') as stream:
+            rows = list(csv.reader(stream))
+        rows[4][4] = '{"reason":"manual_confirmation","reason":"timeout"}'
+        with (self.folder/'events.csv').open('w', newline='') as stream:
+            csv.writer(stream).writerows(rows)
+        self.assertIn('malformed_event', validate_folder(self.folder)['errors'])
+
+    def test_duplicate_manifest_key_rejected(self):
+        self.report()
+        path = self.folder/'manifest.json'
+        encoded = path.read_text()
+        path.write_text(encoded[:-1] + ',"session_id":"duplicate"}')
+        with self.assertRaisesRegex(ValueError, 'Duplicate JSON key'):
+            validate_folder(self.folder)
+
     def test_out_of_order_time(self):
         self.events[-1][0] = 0
         self.assertIn('invalid_event_time', self.report()['errors'])
