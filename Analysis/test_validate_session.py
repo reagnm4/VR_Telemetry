@@ -5,7 +5,13 @@ from validate_session import validate, COMPONENTS
 class ValidationTests(unittest.TestCase):
     def setUp(self):
         self.manifest = dict(schema_version='0.1.0', sample_count=3,
-                             duration_sec=0.1, sample_rate_hz=72)
+                             duration_sec=0.1, sample_rate_hz=72,
+                             session_id='test', participant_id='P000',
+                             environment_id='unit_test', condition='test', trial_number=1,
+                             start_utc='2026-01-01T00:00:00+00:00',
+                             end_utc='2026-01-01T00:00:01+00:00',
+                             coordinate_system='Unity left-handed, Y-up, meters. Floor plane = X by Z.',
+                             rotation_format='quaternion (x,y,z,w)', telemetry_file='telemetry.csv')
         self.rows = []
         for i in range(3):
             row = {'t_sec': i/72, 'frame': i}
@@ -72,6 +78,12 @@ class ValidationTests(unittest.TestCase):
 
     def test_new_schema_optional_origin(self):
         self.manifest['schema_version'] = '0.2.0'
+        self.manifest.update(missed_sample_deadlines=0,
+                             sampling_policy='one_observation_per_LateUpdate_no_backfill',
+                             timestamp_source='monotonic application observation',
+                             frame_semantics='Unity Time.frameCount',
+                             origin_reference_assigned=False,
+                             tracking_validity='not_recorded', unity_version='6000.5.2f1')
         for row in self.rows:
             row.update({f'origin_{c}': float('nan') for c in COMPONENTS})
         self.columns = list(self.rows[0])
@@ -81,6 +93,40 @@ class ValidationTests(unittest.TestCase):
     def test_end_bound(self):
         self.manifest['duration_sec'] = 0.001
         self.assertIn('sample_after_manifest_end', self.report()['errors'])
+
+    def test_manifest_identity_required(self):
+        self.manifest['participant_id'] = '   '
+        self.assertIn('missing_or_invalid_manifest_identity', self.report()['errors'])
+
+    def test_manifest_utc_required_and_ordered(self):
+        self.manifest['end_utc'] = 'not-a-time'
+        self.assertIn('invalid_manifest_utc', self.report()['errors'])
+        self.manifest['end_utc'] = '2025-01-01T00:00:00+00:00'
+        self.assertIn('manifest_end_before_start', self.report()['errors'])
+
+    def test_event_manifest_is_all_or_none(self):
+        self.manifest['events_file'] = 'events.csv'
+        self.assertIn('incomplete_event_manifest', self.report()['errors'])
+
+    def test_legacy_coordinate_wording_remains_supported(self):
+        self.manifest['coordinate_system'] = (
+            'Unity left-handed, Y-up, meters. Floor plane = X (right) by Z (forward).')
+        self.assertTrue(self.report()['integrity_pass'])
+
+    def test_invalid_provenance_is_rejected_when_present(self):
+        self.manifest['schema_version'] = '0.2.0'
+        self.manifest.update(missed_sample_deadlines=0,
+                             sampling_policy='one_observation_per_LateUpdate_no_backfill',
+                             timestamp_source='monotonic application observation',
+                             frame_semantics='Unity Time.frameCount',
+                             origin_reference_assigned=False,
+                             tracking_validity='not_recorded', unity_version='6000.5.2f1',
+                             scene_name='Scene', application_version='0.1', build_guid='',
+                             runtime_platform='WindowsEditor', execution_context='unknown')
+        for row in self.rows:
+            row.update({f'origin_{c}': float('nan') for c in COMPONENTS})
+        self.columns = list(self.rows[0])
+        self.assertIn('invalid_software_provenance', self.report()['errors'])
 
 
 if __name__ == '__main__':

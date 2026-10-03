@@ -145,11 +145,18 @@ Target payload fields use world-space meters/quaternions and include
 configuration payloads also include planned trial count, countdown, timeout, minimum
 rest, and the operator-selected locomotion label.
 
-## Integrity report — validator version 0.2.0
+## Integrity report — validator version 0.3.0
 
 The validator is separate from raw schemas. Its `integrity_pass` means no structural
 errors were detected under its current rules. It does not certify tracking, physical
 scale, task compliance, stimulus display timing, or research validity.
+
+Version 0.3.0 also requires core session/participant/environment/condition identity,
+timezone-aware start/end timestamps in valid order, declared coordinate and quaternion
+semantics, a non-negative trial number, complete event-extension declarations, and the
+schema 0.2.0 sampling/context metadata. Older schema 0.1.0 coordinate wording remains
+explicitly supported. Pre-provenance 0.2.0 sessions remain valid but receive
+`software_provenance_incomplete`.
 
 Important fields:
 
@@ -172,6 +179,8 @@ Common warnings:
 - `hardware_tracking_validity_unverified`: finite poses are not tracking-status data.
 - `event_times_are_application_commands_not_verified_display_onsets`: event timing
   has not been measured against rendered/displayed onset.
+- `software_provenance_incomplete`: the recording predates one or more additive scene
+  or build-context fields; raw data may still be structurally valid.
 
 Warnings require review in context. They must not be removed from a copied report to
 make a run appear clean.

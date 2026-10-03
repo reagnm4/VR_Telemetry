@@ -13,7 +13,17 @@ class EventValidationTests(unittest.TestCase):
         self.folder = Path(self.temp.name)
         self.manifest = dict(schema_version='0.2.0', sample_count=3, sample_rate_hz=72,
                              duration_sec=10, telemetry_file='telemetry.csv',
-                             events_schema_version='0.1.0', events_file='events.csv')
+                             events_schema_version='0.1.0', events_file='events.csv',
+                             session_id='test', participant_id='SYNTHETIC',
+                             environment_id='object_approach_room_v1', condition='test', trial_number=1,
+                             start_utc='2026-01-01T00:00:00+00:00',
+                             end_utc='2026-01-01T00:00:10+00:00',
+                             coordinate_system='Unity left-handed, Y-up, meters. Floor plane = X by Z.',
+                             rotation_format='quaternion (x,y,z,w)', missed_sample_deadlines=0,
+                             sampling_policy='one_observation_per_LateUpdate_no_backfill',
+                             timestamp_source='monotonic application observation',
+                             frame_semantics='Unity Time.frameCount', origin_reference_assigned=True,
+                             tracking_validity='not_recorded', unity_version='6000.5.2f1')
         columns = ['t_sec', 'frame'] + [f'{p}_{c}' for p in ('hmd','lc','rc','origin')
                                        for c in ('px','py','pz','rx','ry','rz','rw')]
         with (self.folder/'telemetry.csv').open('w', newline='') as f:
@@ -32,7 +42,8 @@ class EventValidationTests(unittest.TestCase):
             [2,5,'session_stopped',0,{'reason':'sequence_finished'}]]
 
     def report(self):
-        self.manifest.setdefault('event_count', len(self.events))
+        if 'events_file' in self.manifest:
+            self.manifest.setdefault('event_count', len(self.events))
         (self.folder/'manifest.json').write_text(json.dumps(self.manifest))
         with (self.folder/'events.csv').open('w', newline='') as f:
             writer = csv.writer(f)
@@ -109,6 +120,7 @@ class EventValidationTests(unittest.TestCase):
         self.assertIn('nonconsecutive_trial_numbers', self.report()['errors'])
 
     def test_non_target_trial_schema_remains_supported(self):
+        self.manifest['environment_id'] = 'generic_trial_room'
         self.events = [self.events[0], self.events[1], self.events[3], self.events[-1]]
         for i, row in enumerate(self.events): row[1] = i
         self.assertTrue(self.report()['integrity_pass'])
@@ -123,6 +135,8 @@ class EventValidationTests(unittest.TestCase):
 
     def test_legacy_no_events(self):
         self.manifest.pop('events_file')
+        self.manifest.pop('events_schema_version')
+        self.manifest.pop('event_count', None)
         self.assertTrue(self.report()['integrity_pass'])
 
     def test_path_traversal(self):

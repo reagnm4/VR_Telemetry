@@ -11,9 +11,31 @@ import json
 import math
 from pathlib import Path
 from statistics import median
+from datetime import datetime
 from validate_events import check_events
 
 COMPONENTS = ('px', 'py', 'pz', 'rx', 'ry', 'rz', 'rw')
+CORE_TEXT_FIELDS = ('session_id', 'participant_id', 'environment_id', 'condition',
+                    'start_utc', 'end_utc', 'coordinate_system', 'rotation_format',
+                    'telemetry_file')
+SUPPORTED_COORDINATE_SYSTEMS = {
+    'Unity left-handed, Y-up, meters. Floor plane = X by Z.',
+    'Unity left-handed, Y-up, meters. Floor plane = X (right) by Z (forward).',
+}
+
+
+def _valid_nonnegative_integer(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _parse_utc(value):
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        return parsed if parsed.tzinfo is not None else None
+    except ValueError:
+        return None
 
 
 def validate(manifest, rows, columns):
@@ -21,6 +43,43 @@ def validate(manifest, rows, columns):
     version = manifest.get('schema_version')
     if version not in ('0.1.0', '0.2.0'):
         errors.append('unsupported_schema')
+    if any(not isinstance(manifest.get(field), str) or not manifest[field].strip()
+           for field in CORE_TEXT_FIELDS):
+        errors.append('missing_or_invalid_manifest_identity')
+    if not _valid_nonnegative_integer(manifest.get('trial_number')):
+        errors.append('invalid_manifest_trial_number')
+    start_utc, end_utc = _parse_utc(manifest.get('start_utc')), _parse_utc(manifest.get('end_utc'))
+    if start_utc is None or end_utc is None:
+        errors.append('invalid_manifest_utc')
+    elif end_utc < start_utc:
+        errors.append('manifest_end_before_start')
+    if manifest.get('coordinate_system') not in SUPPORTED_COORDINATE_SYSTEMS:
+        errors.append('unsupported_coordinate_system')
+    if manifest.get('rotation_format') != 'quaternion (x,y,z,w)':
+        errors.append('unsupported_rotation_format')
+    if version == '0.2.0':
+        if (not _valid_nonnegative_integer(manifest.get('missed_sample_deadlines')) or
+                manifest.get('sampling_policy') != 'one_observation_per_LateUpdate_no_backfill' or
+                manifest.get('frame_semantics') != 'Unity Time.frameCount' or
+                not isinstance(manifest.get('origin_reference_assigned'), bool) or
+                any(not isinstance(manifest.get(field), str) or not manifest[field].strip()
+                    for field in ('timestamp_source', 'tracking_validity', 'unity_version'))):
+            errors.append('invalid_schema_0_2_metadata')
+        provenance = ('scene_name', 'application_version', 'build_guid',
+                      'runtime_platform', 'execution_context')
+        if any(field not in manifest for field in provenance):
+            warnings.append('software_provenance_incomplete')
+        if (any(field in manifest and
+                (not isinstance(manifest[field], str) or (field != 'build_guid' and not manifest[field].strip()))
+                for field in provenance) or
+                ('execution_context' in manifest and manifest['execution_context'] not in ('editor', 'player'))):
+            errors.append('invalid_software_provenance')
+    event_fields = ('events_file', 'events_schema_version', 'event_count')
+    present_event_fields = [field in manifest for field in event_fields]
+    if any(present_event_fields) and not all(present_event_fields):
+        errors.append('incomplete_event_manifest')
+    if all(present_event_fields) and not _valid_nonnegative_integer(manifest.get('event_count')):
+        errors.append('invalid_event_count')
     prefixes = ['hmd', 'lc', 'rc'] + (['origin'] if version == '0.2.0' else [])
     required = ['t_sec', 'frame'] + [f'{p}_{c}' for p in prefixes for c in COMPONENTS]
     if len(columns) != len(set(columns)):
@@ -85,7 +144,7 @@ def validate(manifest, rows, columns):
                 metrics['x_span_m'] = max(pose[0] for pose in finite)-min(pose[0] for pose in finite)
                 metrics['z_span_m'] = max(pose[2] for pose in finite)-min(pose[2] for pose in finite)
     warnings.append('hardware_tracking_validity_unverified')
-    return {'validator_version': '0.2.0', 'schema_version': version,
+    return {'validator_version': '0.3.0', 'schema_version': version,
             'integrity_pass': not errors, 'square_test_status': 'not_assessed',
             'errors': errors, 'warnings': warnings, 'metrics': metrics,
             'thresholds': {'quaternion_norm_tolerance': 0.01,

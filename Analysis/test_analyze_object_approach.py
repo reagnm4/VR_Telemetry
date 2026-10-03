@@ -41,6 +41,14 @@ class ObjectApproachAnalysisTests(unittest.TestCase):
             'condition': 'unit_test', 'sample_count': 5, 'sample_rate_hz': 2,
             'duration_sec': 2, 'telemetry_file': 'telemetry.csv',
             'events_schema_version': '0.1.0', 'events_file': 'events.csv', 'event_count': 6,
+            'trial_number': 1, 'start_utc': '2026-01-01T00:00:00+00:00',
+            'end_utc': '2026-01-01T00:00:02+00:00',
+            'coordinate_system': 'Unity left-handed, Y-up, meters. Floor plane = X by Z.',
+            'rotation_format': 'quaternion (x,y,z,w)', 'missed_sample_deadlines': 0,
+            'sampling_policy': 'one_observation_per_LateUpdate_no_backfill',
+            'timestamp_source': 'monotonic application observation',
+            'frame_semantics': 'Unity Time.frameCount', 'origin_reference_assigned': True,
+            'tracking_validity': 'not_recorded', 'unity_version': '6000.5.2f1',
         }
         (self.folder / 'manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
 

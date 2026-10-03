@@ -820,9 +820,50 @@ version increments so future evolution cannot silently alter old meaning.
 Revisit when: any schema or metric changes, a second environment emits new event
 payloads, or the deferred external/API direction becomes active.
 
+## D028 — Validate required manifest identity and context
+
+Recorded: 2026-10-03 (America/New_York).
+Source: unattended audit of the integrity gate authorized by Reagan.
+Status: implemented; retained-session compatibility checked.
+
+Problem: validator 0.2.0 rigorously checked pose/event rows but could pass a synthetic
+manifest missing participant/environment identity, UTC boundaries, declared coordinate
+semantics, or schema-specific sampling metadata. A structurally sound numeric table
+without its research context is not a complete trustworthy session.
+
+Decision: validator 0.3.0 requires nonempty session, participant, environment, and
+condition labels; a non-negative trial number; timezone-aware start/end timestamps in
+valid order; supported coordinate/quaternion declarations; and complete raw filename
+metadata. Schema 0.2.0 additionally requires missed-deadline count, sampling policy,
+timestamp/frame semantics, origin-assignment flag, tracking-validity declaration, and
+Unity version. If any event-extension field is present, all three event filename,
+version, and non-negative count fields are required.
+
+Compatibility choice: both historically emitted schema 0.1.0 coordinate descriptions
+are recognized because their meaning is identical. Additive scene/build fields from
+D026 are not retroactively required; older 0.2.0 sessions receive the explicit
+software_provenance_incomplete warning. This preserves raw evidence while distinguishing
+less complete provenance from current recordings.
+
+Alternatives considered: require new provenance fields retroactively (rejected because
+historical files cannot truthfully acquire metadata after the fact); accept arbitrary
+coordinate strings (rejected because an analyzer cannot safely assume axes/units);
+infer missing identifiers from folder names (rejected because filenames are not a
+schema and inference would fabricate metadata).
+
+Validation: the Python suite passed 44 tests, including missing identity, invalid or
+reversed UTC, incomplete event declaration, schema metadata, legacy coordinate
+compatibility, and invalid supplied provenance. All retained schema 0.2.0 sessions
+still pass; pre-D026 sessions receive
+the intended provenance warning. Retained 0.1.0 sessions remain rejected for their
+known duplicate timestamps, not for compatible coordinate wording.
+
+Revisit when: identifiers move to a controlled registry, protocol versions become
+mandatory, or manifest validation is formalized as JSON Schema.
+
 ## Template for the next entry
 
-### D028 — [Decision title]
+### D029 — [Decision title]
 Recorded local date/time and timezone:
 Source/participants:
 Status:
