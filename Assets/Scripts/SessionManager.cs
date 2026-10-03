@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>Session lifecycle and export. UTC labels; monotonic elapsed time.</summary>
 public class SessionManager : MonoBehaviour
@@ -52,6 +53,7 @@ public class SessionManager : MonoBehaviour
         public bool origin_reference_assigned;
         public string tracking_validity = "not_recorded; finite poses do not prove tracking validity";
         public string unity_version;
+        public string scene_name, application_version, build_guid, runtime_platform, execution_context;
         public string events_file = "events.csv";
         public string events_schema_version = "0.1.0";
         public int event_count;
@@ -76,6 +78,11 @@ public class SessionManager : MonoBehaviour
             participant_id = participantId, environment_id = environmentId,
             condition = condition, trial_number = trialNumber,
             unity_version = Application.unityVersion,
+            scene_name = SceneManager.GetActiveScene().name,
+            application_version = Application.version,
+            build_guid = Application.buildGUID,
+            runtime_platform = Application.platform.ToString(),
+            execution_context = Application.isEditor ? "editor" : "player",
             origin_reference_assigned = telemetry.xrOrigin != null
         };
         sessionFolder = Path.Combine(Application.persistentDataPath, "sessions", manifest.session_id);

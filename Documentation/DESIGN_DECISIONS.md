@@ -758,9 +758,40 @@ software behavior only, not square calibration or headset accuracy.
 Revisit when: distinct validators are introduced for new schemas, or warning classes
 gain protocol-specific exclusion rules.
 
+## D026 — Additive scene and build provenance in each manifest
+
+Recorded: 2026-10-03 (America/New_York).
+Source: unattended reproducibility review authorized by Reagan.
+Status: implemented; clean Unity compilation passed.
+
+Problem: task settings and Unity version were captured, but two recordings from
+different scenes or player builds could otherwise have indistinguishable software
+context. Reproducibility requires enough provenance to identify the executing artifact
+without relying on the session folder name or operator memory.
+
+Decision: snapshot active scene name, Application.version, Application.buildGUID,
+runtime platform, and editor-versus-player context when a session begins. These are
+additive manifest metadata fields. Pose schema 0.2.0 and event schema 0.1.0 columns and
+semantics do not change, and older manifests remain valid.
+
+Alternatives considered: invoke Git at runtime to record a commit hash (not selected
+because Android/player builds may not contain Git, dirty worktrees make the value
+ambiguous, and runtime process access broadens the instrument); embed a generated
+source revision during builds (useful later, but deferred until a repeatable build
+pipeline exists); record device name (not selected because it can expose unnecessary
+machine-identifying information). Build GUID may be empty in Editor and is therefore
+context rather than a universal identifier.
+
+Revisit when: formal player builds begin, at which point a controlled build/version
+pipeline should stamp a source revision and protocol version into the artifact.
+
+Validation: the isolated project recompiled after this change and Unity exited batch
+mode successfully with no C# compiler errors. Player-build values and Android manifest
+contents remain unverified until the first controlled player build.
+
 ## Template for the next entry
 
-### D026 — [Decision title]
+### D027 — [Decision title]
 Recorded local date/time and timezone:
 Source/participants:
 Status:
