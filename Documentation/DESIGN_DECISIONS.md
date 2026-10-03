@@ -789,9 +789,40 @@ Validation: the isolated project recompiled after this change and Unity exited b
 mode successfully with no C# compiler errors. Player-build values and Android manifest
 contents remain unverified until the first controlled player build.
 
+## D027 — Canonical data dictionary and version boundaries
+
+Recorded: 2026-10-03 (America/New_York).
+Source: unattended research-reproducibility review authorized by Reagan.
+Status: documentation implemented; no runtime behavior changed.
+
+Problem: schema fields and caveats existed across source comments, manifests, guides,
+and decision entries. A later analyst or collaborator could reasonably misunderstand
+world-space poses, application event time, target-center distance, missing transforms,
+or the difference between integrity and physical validation.
+
+Decision: add Documentation/DATA_DICTIONARY.md as the canonical field-level reference
+for completed/incomplete folders, manifest metadata, pose and event columns, validator
+outputs, Object-Approach summaries, units, missing-data semantics, allowed conclusions,
+and version-change rules. Keep protocol choices and historical rationale in their
+existing documents; the dictionary defines current data contracts.
+
+Alternatives considered: rely on code as the specification (rejected because research
+collaborators should not reverse-engineer Unity/Python); expand only the usage guide
+(rejected because the raw format spans every environment); formal JSON Schema now
+(deferred because CSV plus multiple evolving manifest versions would add machinery
+before the protocol is stable, though it may become useful for external integration).
+
+The dictionary explicitly prevents head alignment from being renamed gaze/attention,
+integrity pass from being called square validation, or finite coordinates from being
+called verified tracking. It also defines which changes require raw, event, or analysis
+version increments so future evolution cannot silently alter old meaning.
+
+Revisit when: any schema or metric changes, a second environment emits new event
+payloads, or the deferred external/API direction becomes active.
+
 ## Template for the next entry
 
-### D027 — [Decision title]
+### D028 — [Decision title]
 Recorded local date/time and timezone:
 Source/participants:
 Status:
